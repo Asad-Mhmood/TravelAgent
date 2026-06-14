@@ -7,6 +7,7 @@ requires-python = ">=3.9"
 dependencies = [
     "livekit-agents[mcp]>=1.2.0",
     "livekit-plugins-openai>=1.0.0",
+    "livekit-plugins-groq>=1.0.0",
     "livekit-plugins-deepgram>=1.0.0",
     "livekit-plugins-silero>=1.0.0",
     "livekit-plugins-turn-detector>=1.0.0",

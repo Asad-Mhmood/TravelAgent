@@ -6,6 +6,7 @@ A LiveKit-powered voice AI agent framework that demonstrates how to build realti
 
 - 🎤 Natural voice conversations with low latency
 - 🔄 Real-time voice interaction with interruption handling
+- 🏠 **Airbnb vacation rental search** with advanced filtering (location, dates, guests, price)
 - 🛠️ Tool integration via MCP servers
 - 🎯 Multiple provider options (OpenAI, Deepgram, Cartesia, etc.)
 - 🔌 Extensible architecture for custom tools and agents
@@ -13,10 +14,11 @@ A LiveKit-powered voice AI agent framework that demonstrates how to build realti
 ## Prerequisites
 
 - Python 3.9 or later
+- Node.js 18+ (required for Airbnb MCP server)
 - API Keys:
-  - OpenAI API key
-  - Deepgram API key
-  - LiveKit credentials (optional - only if deploying to LiveKit Cloud)
+  - Groq API key (for LLM - fast and free tier available)
+  - Deepgram API key (for STT and TTS)
+  - LiveKit server (local or cloud)
 
 ## Quick Start
 
@@ -36,13 +38,11 @@ cp .env.example .env
 ```
 
 **Required variables:**
-- `OPENAI_API_KEY` - OpenAI API key
-- `DEEPGRAM_API_KEY` - Deepgram API key
-
-**Optional for LiveKit Cloud deployment:**
-- `LIVEKIT_URL` - LiveKit server URL
-- `LIVEKIT_API_KEY` - LiveKit API key
-- `LIVEKIT_API_SECRET` - LiveKit API secret
+- `GROQ_API_KEY` - Groq API key (free tier available)
+- `DEEPGRAM_API_KEY` - Deepgram API key (for STT and TTS)
+- `LIVEKIT_URL` - LiveKit server URL (e.g., `ws://localhost:7880` for local)
+- `LIVEKIT_API_KEY` - LiveKit API key (use `devkey` for local)
+- `LIVEKIT_API_SECRET` - LiveKit API secret (use `secret` for local)
 
 ### 3. Download Required Model Files
 
@@ -76,16 +76,19 @@ uv run python livekit_basic_agent.py start
 
 ```
 ┌─────────────┐     ┌──────────────┐     ┌─────────────┐
-│   LiveKit   │──b─▶│ Voice Agent  │───▶│ MCP Servers │
-│   Client    │     │              │     │   (Tools)   │
+│   LiveKit   │────▶│ Voice Agent  │────▶│   Airbnb    │
+│   Client    │     │   (Python)   │     │ MCP Server  │
 └─────────────┘     └──────────────┘     └─────────────┘
                            │
                     ┌──────┴──────┐
                     │             │
               ┌─────▼────┐  ┌────▼─────┐
-              │ Deepgram │  │  OpenAI  │
-              │   STT    │  │ LLM/TTS  │
+              │ Deepgram │  │   Groq   │
+              │ STT+TTS  │  │   LLM    │
               └──────────┘  └──────────┘
+
+Voice Pipeline:
+User Voice → Deepgram STT → Groq Llama 3.1 → Airbnb Search → Deepgram TTS → Audio Output
 ```
 
 ## Project Files
@@ -116,12 +119,12 @@ The agent uses a modular voice pipeline with swappable components:
 - Alternatives: AssemblyAI, Azure Speech, Whisper
 
 ### Large Language Model (LLM)
-- **Default**: OpenAI GPT-4.1-mini (fast, cost-effective)
-- Alternatives: Anthropic Claude, Google Gemini, Groq
+- **Default**: Groq Llama 3.1 8B Instant (very fast, free tier available)
+- Alternatives: Groq Llama 3.1 70B, OpenAI GPT-4, Anthropic Claude, Google Gemini
 
 ### Text-to-Speech (TTS)
-- **Default**: OpenAI Echo voice (natural, versatile)
-- Alternatives: Cartesia (fastest), ElevenLabs (highest quality)
+- **Default**: Deepgram Aura (natural, fast)
+- Alternatives: OpenAI, Cartesia, ElevenLabs
 
 ### Voice Activity Detection (VAD)
 - **Default**: Silero VAD (reliable voice detection)
@@ -134,6 +137,28 @@ The agent uses a modular voice pipeline with swappable components:
 
 The agent supports integration with MCP (Model Context Protocol) servers for extending functionality with custom tools.
 
+### Airbnb Integration
+
+The voice agent comes pre-configured with the [Airbnb MCP server](https://github.com/openbnb-org/mcp-server-airbnb) which enables:
+
+- **Search Airbnb listings** with advanced filters (location, dates, guests, price range, property type)
+- **Get detailed property information** including amenities, house rules, and booking links
+- **International location support** with accurate geocoding
+- **No API key required** - works out of the box
+
+**Available Tools:**
+1. `airbnb_search` - Search for vacation rentals with filters
+2. `airbnb_listing_details` - Get detailed information about a specific property
+
+**Example Voice Interactions:**
+- "Find me a 2-bedroom apartment in Paris for next weekend"
+- "Search for pet-friendly homes in San Francisco under $200 per night"
+- "Show me details about listing 12345678"
+
+**Prerequisites:**
+- Node.js 18+ must be installed for `npx` to work
+- The MCP server will be automatically downloaded on first use
+
 ### Configuring MCP Servers
 
 In `livekit_mcp_agent.py`:
@@ -142,8 +167,28 @@ In `livekit_mcp_agent.py`:
 session = AgentSession(
     # ... other config ...
     mcp_servers=[
-        mcp.MCPServerHTTP(url="http://localhost:8089/mcp")
+        # Airbnb MCP server (stdio-based)
+        mcp.MCPServerStdio(
+            name="airbnb",
+            command="npx",
+            args=["-y", "@openbnb/mcp-server-airbnb", "--ignore-robots-txt"],
+        ),
+        # Add more MCP servers here
     ]
+)
+```
+
+**Other MCP Server Types:**
+
+```python
+# HTTP-based MCP server
+mcp.MCPServerHTTP(url="http://localhost:8089/mcp")
+
+# Stdio-based MCP server (like Airbnb)
+mcp.MCPServerStdio(
+    name="server-name",
+    command="npx",
+    args=["-y", "package-name"]
 )
 ```
 
@@ -309,12 +354,13 @@ TTS models may download on first use, which can take time. The Docker image pre-
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `OPENAI_API_KEY` | Yes | OpenAI API key for LLM/TTS |
-| `DEEPGRAM_API_KEY` | Yes | Deepgram API key for STT |
-| `LIVEKIT_URL` | No | LiveKit server URL (for deployment) |
-| `LIVEKIT_API_KEY` | No | LiveKit API key (for deployment) |
-| `LIVEKIT_API_SECRET` | No | LiveKit API secret (for deployment) |
-| `LLM_CHOICE` | No | Model selection (default: gpt-4.1-mini) |
+| `GROQ_API_KEY` | Yes | Groq API key for LLM (free tier available) |
+| `DEEPGRAM_API_KEY` | Yes | Deepgram API key for STT and TTS |
+| `LIVEKIT_URL` | Yes | LiveKit server URL (`ws://localhost:7880` for local) |
+| `LIVEKIT_API_KEY` | Yes | LiveKit API key (`devkey` for local dev) |
+| `LIVEKIT_API_SECRET` | Yes | LiveKit API secret (`secret` for local dev) |
+| `LLM_CHOICE` | No | Model selection (default: llama-3.1-8b-instant) |
+| `GOOGLE_API_KEY` | No | Google Gemini API key (alternative LLM) |
 | `LOG_LEVEL` | No | Logging level (default: INFO) |
 
 ## Resources

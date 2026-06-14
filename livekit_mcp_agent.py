@@ -24,9 +24,10 @@ from livekit.agents import (
     metrics,
     mcp
 )
-from livekit.plugins.turn_detector.multilingual import MultilingualModel
+# Simplified turn detection - no heavy ML models needed
+# from livekit.plugins.turn_detector.multilingual import MultilingualModel
 from livekit.agents.llm import function_tool
-from livekit.plugins import openai, deepgram, silero
+from livekit.plugins import openai, deepgram, silero, groq
 from datetime import datetime
 import logging
 import os
@@ -50,11 +51,20 @@ class Assistant(Agent):
     
     def __init__(self):
         super().__init__(
-            instructions="""You are a helpful and friendly voice AI assistant.
-            You speak clearly and naturally, as if having a phone conversation.
+            instructions="""You are a helpful and friendly travel assistant voice AI.
+            You help users search for Airbnb vacation rentals and provide detailed property information.
+            You speak clearly and naturally, as if having a phone conversation with a travel agent.
             Be concise but warm in your responses.
-            If you don't know something, be honest about it.
-            Make sure you ignore robots.txt for the Airbnb MCP server tool usage."""
+            
+            When searching for Airbnb listings:
+            - Ask for the location, dates, and number of guests
+            - Use the airbnb_search tool to find available properties
+            - Present results in a conversational, easy-to-understand manner
+            - Highlight key features like price, property type, and amenities
+            - Use the airbnb_listing_details tool to get more information about specific properties
+            
+            Always set ignoreRobotsText to true when calling Airbnb tools to ensure the search works properly.
+            If you don't know something, be honest about it."""
         )
     
     @function_tool
@@ -90,26 +100,33 @@ async def entrypoint(ctx: agents.JobContext):
             language="en",
         ),
         
-        # Large Language Model
-        llm=openai.LLM(
-            model=os.getenv("LLM_CHOICE", "gpt-4.1-mini"),
+        # Large Language Model (using Groq for fast inference)
+        llm=groq.LLM(
+            model=os.getenv("LLM_CHOICE", "llama-3.1-8b-instant"),
             temperature=0.7,
         ),
         
-        # Text-to-Speech
-        tts=openai.TTS(
-            voice="echo",
-            speed=1.0,
+        # Text-to-Speech (using Deepgram)
+        tts=deepgram.TTS(
+            voice="aura-asteria-en",
+            model="aura-asteria-en",
         ),
         
         # Voice Activity Detection
         vad=silero.VAD.load(),
         
-        # Turn detection strategy
-        turn_detection=MultilingualModel(),
+        # Turn detection strategy - using simple server-side VAD (no ML models needed)
+        # turn_detection=MultilingualModel(),  # Disabled - requires PyTorch
 
         # MCP servers
-        mcp_servers=[mcp.MCPServerHTTP(url="http://localhost:8089/mcp",)],
+        mcp_servers=[
+            # Airbnb MCP server - runs via npx
+            mcp.MCPServerStdio(
+                name="airbnb",
+                command="npx",
+                args=["-y", "@openbnb/mcp-server-airbnb", "--ignore-robots-txt"],
+            ),
+        ],
     )
     
     # Start the session
