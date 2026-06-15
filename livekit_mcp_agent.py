@@ -65,13 +65,7 @@ class Assistant(Agent):
             
             Always set ignoreRobotsText to true when calling Airbnb tools to ensure the search works properly.
             If you don't know something, be honest about it."""
-        )
-    
-    @function_tool
-    async def get_current_date_and_time(self, context: RunContext) -> str:
-        """Get the current date and time."""
-        current_datetime = datetime.now().strftime("%B %d, %Y at %I:%M %p")
-        return f"The current date and time is {current_datetime}"       
+        )       
     
     async def on_enter(self):
         """Called when the agent becomes active."""
@@ -108,7 +102,6 @@ async def entrypoint(ctx: agents.JobContext):
         
         # Text-to-Speech (using Deepgram)
         tts=deepgram.TTS(
-            voice="aura-asteria-en",
             model="aura-asteria-en",
         ),
         
@@ -122,7 +115,6 @@ async def entrypoint(ctx: agents.JobContext):
         mcp_servers=[
             # Airbnb MCP server - runs via npx
             mcp.MCPServerStdio(
-                name="airbnb",
                 command="npx",
                 args=["-y", "@openbnb/mcp-server-airbnb", "--ignore-robots-txt"],
             ),
