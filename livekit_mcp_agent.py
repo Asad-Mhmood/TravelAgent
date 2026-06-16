@@ -52,18 +52,35 @@ class Assistant(Agent):
     def __init__(self):
         super().__init__(
             instructions="""You are a helpful and friendly travel assistant voice AI.
-            You help users search for Airbnb vacation rentals and provide detailed property information.
+            
+            You help users with complete travel planning including:
+            - Searching Airbnb vacation rentals
+            - Finding and comparing flight options
+            - Providing detailed property and flight information
+            
             You speak clearly and naturally, as if having a phone conversation with a travel agent.
             Be concise but warm in your responses.
             
-            When searching for Airbnb listings:
-            - Ask for the location, dates, and number of guests
+            AIRBNB SEARCHES:
+            - Ask for: location, dates, and number of guests
             - Use the airbnb_search tool to find available properties
-            - Present results in a conversational, easy-to-understand manner
-            - Highlight key features like price, property type, and amenities
-            - Use the airbnb_listing_details tool to get more information about specific properties
+            - Present results conversationally with price, type, and key features
+            - Use airbnb_listing_details for more information
+            - Always set ignoreRobotsText to true for Airbnb tools
             
-            Always set ignoreRobotsText to true when calling Airbnb tools to ensure the search works properly.
+            FLIGHT SEARCHES:
+            - Ask for: origin, destination, dates, and number of passengers
+            - Use flight search tools to find available flights
+            - Compare prices across different dates if helpful
+            - Provide booking URLs when available
+            - Mention airline, price, duration, and stops
+            
+            COMBINED TRAVEL PLANNING:
+            - You can search for both accommodations AND flights
+            - Help users plan complete trips
+            - Compare total trip costs
+            - Suggest optimal travel dates based on prices
+            
             If you don't know something, be honest about it."""
         )       
     
@@ -111,13 +128,46 @@ async def entrypoint(ctx: agents.JobContext):
         # Turn detection strategy - using simple server-side VAD (no ML models needed)
         # turn_detection=MultilingualModel(),  # Disabled - requires PyTorch
 
-        # MCP servers
+        # ==========================================
+        # MCP SERVERS CONFIGURATION
+        # ==========================================
+        # Add or remove MCP servers here to extend agent capabilities
+        
         mcp_servers=[
-            # Airbnb MCP server - runs via npx
+            # ------------------------------------------
+            # AIRBNB - Vacation Rental Search
+            # ------------------------------------------
+            # Purpose: Search for vacation rentals and get property details
+            # Tools: airbnb_search, airbnb_listing_details
+            # No API key required
             mcp.MCPServerStdio(
                 command="npx",
                 args=["-y", "@openbnb/mcp-server-airbnb", "--ignore-robots-txt"],
             ),
+            
+            # ------------------------------------------
+            # FLIGHT SEARCH - Real-time Flight Data
+            # ------------------------------------------
+            # Purpose: Search flights, compare prices, get booking URLs
+            # Tools: Flight search with flexible dates
+            # API: https://flights.fctolabs.com/
+            mcp.MCPServerHTTP(
+                url="https://flights.fctolabs.com/mcp",
+            ),
+            
+            # ------------------------------------------
+            # ADD MORE MCP SERVERS BELOW
+            # ------------------------------------------
+            # Template for stdio-based servers (like Airbnb):
+            # mcp.MCPServerStdio(
+            #     command="npx",
+            #     args=["-y", "package-name"],
+            # ),
+            #
+            # Template for HTTP-based servers (like Flight Search):
+            # mcp.MCPServerHTTP(
+            #     url="https://api.example.com/mcp",
+            # ),
         ],
     )
     
